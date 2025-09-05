@@ -1,0 +1,11 @@
+streamlit
+opencv-python
+numpy
+torch
+torchvision
+torchaudio
+ffmpeg-python
+Pillow
+tqdm
+moviepy
+timm
