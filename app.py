@@ -47,13 +47,13 @@ h1, h2, h3, h4, h5, h6 {
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Load API Key (future use)
+# Load API Key securely
 # -------------------------------
 API_KEY = st.secrets.get("API_KEY", os.getenv("API_KEY", None))
 if API_KEY:
     st.sidebar.success("🔑 API key loaded")
 else:
-    st.sidebar.warning("⚠️ No API key found. Local processing only.")
+    st.sidebar.warning("⚠️ No API key found. Local-only mode")
 
 # -------------------------------
 # Load MiDaS depth model (cached)

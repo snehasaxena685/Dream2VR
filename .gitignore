@@ -1,4 +1,17 @@
+<<<<<<< HEAD
 .streamlit/secrets.toml
 __pycache__/
 *.pyc
 *.pyo
+=======
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+.venv/
+env/
+
+# Ignore Streamlit secrets
+.streamlit/secrets.toml
+>>>>>>> 0ddc378 (Added README and .gitignore for secure deployment)
