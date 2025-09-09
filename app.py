@@ -120,14 +120,30 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
     scale = target_height / height
     new_w = int(width * scale)
     new_h = target_height
     out_fps = max(1.0, fps / every_n)
-    fourcc = cv2.VideoWriter_fourcc(*"avc1")
-    writer = cv2.VideoWriter(output_path, fourcc, out_fps, (new_w * 2, new_h))
-    if not writer.isOpened():
-        raise RuntimeError("⚠️ VideoWriter failed to open. Try another codec.")
+
+    # 🔧 Try safer codecs
+    codecs = [
+        ("mp4v", output_path),  # MP4
+        ("MJPG", output_path.replace(".mp4", ".avi")),  # AVI fallback
+    ]
+    writer = None
+    chosen_codec = None
+
+    for codec, path in codecs:
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        writer = cv2.VideoWriter(path, fourcc, out_fps, (new_w * 2, new_h))
+        if writer.isOpened():
+            chosen_codec = codec
+            output_path = path
+            break
+
+    if writer is None or not writer.isOpened():
+        raise RuntimeError("⚠️ VideoWriter failed to open. No supported codecs available.")
 
     anaglyph_preview = None
     frame_idx = 0
@@ -140,16 +156,20 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
         if frame_idx % every_n != 0:
             frame_idx += 1
             continue
+
         frame = cv2.resize(frame, (new_w, new_h))
         depth = estimate_depth(frame)
         left, right, sbs = make_stereo(frame, depth, max_disp=max_disp)
         writer.write(sbs)
         written_frames += 1
+
         if anaglyph_preview is None:
             anaglyph_preview = make_anaglyph(left, right)
+
         if progress_callback:
             percent = int((frame_idx / total_frames) * 100)
             progress_callback(min(percent, 100))
+
         frame_idx += 1
 
     cap.release()
@@ -158,7 +178,7 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     if written_frames == 0:
         raise RuntimeError("⚠️ No frames were written to output video.")
 
-    return output_path, anaglyph_preview, total_frames, written_frames, out_fps
+    return output_path, anaglyph_preview, total_frames, written_frames, out_fps, chosen_codec
 
 # -------------------------------
 # Streamlit UI
