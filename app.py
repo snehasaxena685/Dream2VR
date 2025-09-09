@@ -202,4 +202,4 @@ if process_btn and uploaded:
         # -------------------------------
         if "Anaglyph" in preview_modes and anaglyph_frame is not None:
             st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
-            st.image(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
+            st.video(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
