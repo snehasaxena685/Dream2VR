@@ -133,8 +133,13 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     new_w = int(width * scale)
     new_h = target_height
     out_fps = max(1.0, fps / every_n)
-    fourcc = cv2.VideoWriter_fourcc(*"avc1")
-    writer = cv2.VideoWriter(output_path, fourcc, out_fps, (new_w * 2, new_h))
+    
+    # -------------------------------
+    # Use portable codec for Streamlit Cloud
+    # -------------------------------
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    width_even = (new_w * 2) // 2 * 2  # ensure even width
+    writer = cv2.VideoWriter(output_path, fourcc, out_fps, (width_even, new_h))
     if not writer.isOpened():
         raise RuntimeError("⚠️ VideoWriter failed to open. Try another codec.")
 
