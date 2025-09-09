@@ -57,7 +57,7 @@ h1, h2, h3, h4, h5, h6 {
 # -------------------------------
 API_KEY = st.secrets.get("API_KEY", os.getenv("API_KEY", None))
 if API_KEY:
-    st.sidebar.success("🔑 API key loaded")
+    st.sidebar.success("🔑WELCOME TO Dream2VR")
 else:
     st.sidebar.warning("⚠️ No API key found. Local processing only.")
 
