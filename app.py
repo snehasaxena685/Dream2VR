@@ -263,7 +263,6 @@ aframe_html = f"""
 </html>
 """
 components.html(aframe_html, height=500)
-
-        if "Anaglyph" in preview_modes and anaglyph_frame is not None:
+if "Anaglyph" in preview_modes and anaglyph_frame is not None:
             st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
             st.image(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
