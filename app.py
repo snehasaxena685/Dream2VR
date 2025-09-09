@@ -103,7 +103,7 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     width_even = (new_w * 2) // 2 * 2
     writer = cv2.VideoWriter(output_path, fourcc, out_fps, (width_even, new_h))
     if not writer.isOpened():
-        raise RuntimeError("⚠ VideoWriter failed to open. Try another codec.")
+        raise RuntimeError("⚠️ VideoWriter failed to open. Try another codec.")
 
     anaglyph_preview = None
     frame_idx = 0
@@ -132,7 +132,7 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     writer.release()
 
     if written_frames == 0:
-        raise RuntimeError("⚠ No frames were written to output video.")
+        raise RuntimeError("⚠️ No frames were written to output video.")
 
     return output_path, anaglyph_preview, total_frames, written_frames, out_fps
 
@@ -147,7 +147,7 @@ uploaded = st.file_uploader("Upload a short MP4 (5–15s is best)", type=["mp4",
 if uploaded:
     st.video(uploaded)
 
-st.subheader("⚙ Settings")
+st.subheader("⚙️ Settings")
 with st.container():
     max_disp = st.slider("Max disparity (3D effect strength)", 4, 64, 24)
     target_h = st.selectbox("Target height", [360, 480, 720], index=1)
@@ -195,7 +195,7 @@ if process_btn and uploaded:
         if "SBS" in preview_modes:
             st.subheader("📺 SBS VR Video")
             st.video(video_bytes)
-            st.download_button("⬇ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
+            st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
 
         # -------------------------------
         # Anaglyph preview
