@@ -190,16 +190,19 @@ if process_btn and uploaded:
             video_bytes = f.read()
 
         # -------------------------------
-        # SBS preview
-        # -------------------------------
-        if "SBS" in preview_modes:
-            st.subheader("📺 SBS VR Video")
-            st.video(video_bytes)
-            st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
+    # SBS Video
+    # -------------------------------
+    if "SBS" in preview_modes:
+        st.subheader("📺 SBS VR Video")
+        with open(sbs_path, "rb") as f:
+            st.video(f.read())
+        st.download_button("⬇️ Download SBS Video", open(sbs_path, "rb").read(), file_name="dream2vr_sbs.mp4")
 
-        # -------------------------------
-        # Anaglyph preview
-        # -------------------------------
-        if "Anaglyph" in preview_modes and anaglyph_frame is not None:
-            st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
-            st.image(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
+    # -------------------------------
+    # Anaglyph Video
+    # -------------------------------
+    if "Anaglyph" in preview_modes:
+        st.subheader("👓 Anaglyph 3D Video")
+        with open(anaglyph_path, "rb") as f:
+            st.video(f.read())
+        st.download_button("⬇️ Download Anaglyph Video", open(anaglyph_path, "rb").read(), file_name="dream2vr_anaglyph.mp4")
