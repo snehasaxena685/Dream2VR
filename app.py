@@ -241,22 +241,22 @@ if process_btn and uploaded:
             st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
 
         # -------------------------------
-        # WebVR preview
+        # WebVR preview (fixed with base64 embedding)
         # -------------------------------
         if "WebVR" in preview_modes:
             st.subheader("🕶️ Interactive WebVR Preview")
-            video_url = final_out.replace("\\", "/")  # safe now
+            video_b64 = base64.b64encode(video_bytes).decode()
             aframe_html = f"""
             <html>
-            <head>
-              <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-            </head>
-            <body style="margin:0; background:black;">
-              <a-scene>
-                <a-videosphere src="file://{video_url}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
-                <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
-              </a-scene>
-            </body>
+              <head>
+                <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+              </head>
+              <body style="margin:0; background:black;">
+                <a-scene>
+                  <a-videosphere src="data:video/mp4;base64,{video_b64}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
+                  <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
+                </a-scene>
+              </body>
             </html>
             """
             components.html(aframe_html, height=500)
