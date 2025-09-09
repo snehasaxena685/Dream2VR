@@ -27,7 +27,7 @@ h1,h2,h3,h4,h5,h6 { font-family: 'Orbitron', sans-serif; color: #00fff7; }
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Load MiDaS model
+# Load MiDaS depth model
 # -------------------------------
 @st.cache_resource
 def load_midas():
@@ -67,10 +67,12 @@ def make_stereo(frame_bgr, depth_norm, max_disp=24):
     h, w = depth_norm.shape
     disp = (depth_norm * max_disp).astype(np.float32)
     x, y = np.meshgrid(np.arange(w), np.arange(h))
-    map_x_left = (x + disp).astype(np.float32)
-    map_x_right = (x - disp).astype(np.float32)
-    left = cv2.remap(frame_bgr, map_x_left, y.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
-    right = cv2.remap(frame_bgr, map_x_right, y.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    x = x.astype(np.float32)
+    y = y.astype(np.float32)
+    map_x_left = x + disp
+    map_x_right = x - disp
+    left = cv2.remap(frame_bgr, map_x_left, y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    right = cv2.remap(frame_bgr, map_x_right, y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
     sbs = cv2.hconcat([left, right])
     return left, right, sbs
 
@@ -83,7 +85,7 @@ def make_anaglyph(left, right):
     anaglyph[..., 2] = right_gray
     return anaglyph
 
-def process_video(input_path, max_disp=24, target_height=480, every_n=1, progress_callback=None):
+def process_video(input_path, sbs_path, anaglyph_path, max_disp=24, target_height=480, every_n=1, progress_callback=None):
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         raise RuntimeError("Could not open input video")
@@ -92,27 +94,21 @@ def process_video(input_path, max_disp=24, target_height=480, every_n=1, progres
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
     scale = target_height / height
     new_w = int(width * scale)
     new_h = target_height
-
-    # ensure even dimensions
     new_w += new_w % 2
     new_h += new_h % 2
-    sbs_w = new_w * 2
-
     out_fps = max(1.0, fps / every_n)
 
-    # temporary files
-    out_sbs_path = os.path.join(tempfile.gettempdir(), f"sbs_{uuid.uuid4().hex}.mp4")
-    out_ana_path = os.path.join(tempfile.gettempdir(), f"ana_{uuid.uuid4().hex}.mp4")
+    # H.264 codec
+    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+    writer_sbs = cv2.VideoWriter(sbs_path, fourcc, out_fps, (new_w*2, new_h))
+    writer_anaglyph = cv2.VideoWriter(anaglyph_path, fourcc, out_fps, (new_w, new_h))
 
-    fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264, browser-friendly
-    writer_sbs = cv2.VideoWriter(out_sbs_path, fourcc, out_fps, (sbs_w, new_h))
-    writer_ana = cv2.VideoWriter(out_ana_path, fourcc, out_fps, (new_w, new_h))
-
+    first_ana_frame = None
     frame_idx = 0
+    written_frames = 0
 
     while True:
         ret, frame = cap.read()
@@ -127,24 +123,28 @@ def process_video(input_path, max_disp=24, target_height=480, every_n=1, progres
         anaglyph = make_anaglyph(left, right)
 
         writer_sbs.write(sbs)
-        writer_ana.write(anaglyph)
-        frame_idx += 1
+        writer_anaglyph.write(anaglyph)
 
+        if first_ana_frame is None:
+            first_ana_frame = anaglyph
+
+        written_frames += 1
         if progress_callback:
             progress_callback(min(int(frame_idx / total_frames * 100), 100))
+        frame_idx += 1
 
     cap.release()
     writer_sbs.release()
-    writer_ana.release()
+    writer_anaglyph.release()
 
-    return out_sbs_path, out_ana_path, total_frames, frame_idx, out_fps
+    return sbs_path, anaglyph_path, first_ana_frame, total_frames, written_frames, out_fps
 
 # -------------------------------
 # Streamlit UI
 # -------------------------------
 st.set_page_config(page_title="Dream2VR — 2D ➜ VR", page_icon="🎬", layout="centered")
 st.title("🎬 Dream2VR — 2D ➜ VR")
-st.caption("Upload a 2D video and preview SBS & Anaglyph 3D videos.")
+st.caption("Upload a 2D video and preview it in SBS or Anaglyph 3D mode.")
 
 uploaded = st.file_uploader("Upload a short MP4 (5–15s is best)", type=["mp4", "mov", "m4v"])
 if uploaded:
@@ -154,47 +154,47 @@ st.subheader("⚙️ Settings")
 max_disp = st.slider("Max disparity (3D effect strength)", 4, 64, 24)
 target_h = st.selectbox("Target height", [360, 480, 720], index=1)
 every_n = st.selectbox("Process every Nth frame (speed boost)", [1, 2, 3], index=0)
+preview_modes = st.multiselect("Select preview modes:", ["SBS", "Anaglyph"], default=["SBS"])
 
-process_btn = st.button("🚀 Process Video")
+process_btn = st.button("🚀 Process Video", type="primary", use_container_width=True)
 
 if process_btn and uploaded:
-    with st.spinner("🤖 Processing video frames..."):
+    with st.spinner("🤖 Processing video..."):
         temp_in = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         temp_in.write(uploaded.read())
         temp_in.close()
+
+        temp_sbs = os.path.join(tempfile.gettempdir(), f"sbs_{uuid.uuid4().hex}.mp4")
+        temp_anaglyph = os.path.join(tempfile.gettempdir(), f"ana_{uuid.uuid4().hex}.mp4")
 
         progress_bar = st.progress(0)
 
         def update_progress(pct):
             progress_bar.progress(pct)
 
-        t0 = time.time()
-        sbs_path, ana_path, total_frames, written_frames, out_fps = process_video(
-            temp_in.name,
+        sbs_path, anaglyph_path, first_ana_frame, total_frames, written_frames, out_fps = process_video(
+            temp_in.name, temp_sbs, temp_anaglyph,
             max_disp=max_disp,
             target_height=target_h,
             every_n=every_n,
             progress_callback=update_progress
         )
-        dt = time.time() - t0
 
-        st.success(f"✅ Done in {dt:.1f} seconds")
-        st.info(f"🎥 Frames processed: {written_frames} / {total_frames}, Output FPS: {out_fps:.2f}")
+    st.success(f"✅ Done. Processed {written_frames} frames.")
 
-        # -------------------------------
-        # SBS Video
-        # -------------------------------
+    # -------------------------------
+    # SBS Video
+    # -------------------------------
+    if "SBS" in preview_modes:
         st.subheader("📺 SBS VR Video")
         with open(sbs_path, "rb") as f:
-            sbs_bytes = f.read()
-        st.video(sbs_bytes)
-        st.download_button("⬇️ Download SBS Video", sbs_bytes, file_name="dream2vr_sbs.mp4")
+            st.video(f.read())
+        st.download_button("⬇️ Download SBS Video", open(sbs_path, "rb").read(), file_name="dream2vr_sbs.mp4")
 
-        # -------------------------------
-        # Anaglyph Video
-        # -------------------------------
-        st.subheader("👓 Anaglyph 3D Video (Red/Cyan Glasses)")
-        with open(ana_path, "rb") as f:
-            ana_bytes = f.read()
-        st.video(ana_bytes)
-        st.download_button("⬇️ Download Anaglyph Video", ana_bytes, file_name="dream2vr_anaglyph.mp4")
+    # -------------------------------
+    # Anaglyph Video
+    # -------------------------------
+    if "Anaglyph" in preview_modes:
+        st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
+        st.image(first_ana_frame, channels="BGR", caption="Preview with red/cyan glasses")
+        st.download_button("⬇️ Download Anaglyph Video", open(anaglyph_path, "rb").read(), file_name="dream2vr_anaglyph.mp4")
