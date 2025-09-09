@@ -233,35 +233,6 @@ if process_btn and uploaded:
             video_bytes = f.read()
 
         # -------------------------------
-        # SBS preview
-        # -------------------------------
-        if "SBS" in preview_modes:
-            st.subheader("📺 SBS VR Video")
-            st.video(video_bytes)
-            st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
-
-        # -------------------------------
-        # WebVR preview
-        # -------------------------------
-        if "WebVR" in preview_modes:
-            st.subheader("🕶️ Interactive WebVR Preview")
-            video_url = final_out.replace("\\", "/")  # safe now
-            aframe_html = f"""
-            <html>
-            <head>
-              <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-            </head>
-            <body style="margin:0; background:black;">
-              <a-scene>
-                <a-videosphere src="file://{video_url}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
-                <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
-              </a-scene>
-            </body>
-            </html>
-            """
-            components.html(aframe_html, height=500)
-
-        # -------------------------------
         # Anaglyph preview
         # -------------------------------
         if "Anaglyph" in preview_modes and anaglyph_frame is not None:
