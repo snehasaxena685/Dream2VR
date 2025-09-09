@@ -133,12 +133,9 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     new_w = int(width * scale)
     new_h = target_height
     out_fps = max(1.0, fps / every_n)
-    
-    # -------------------------------
-    # Use portable codec for Streamlit Cloud
-    # -------------------------------
+
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    width_even = (new_w * 2) // 2 * 2  # ensure even width
+    width_even = (new_w * 2) // 2 * 2
     writer = cv2.VideoWriter(output_path, fourcc, out_fps, (width_even, new_h))
     if not writer.isOpened():
         raise RuntimeError("⚠️ VideoWriter failed to open. Try another codec.")
@@ -205,64 +202,68 @@ if process_btn and uploaded:
         temp_in.close()
         out_path = os.path.join(tempfile.gettempdir(), f"out_{uuid.uuid4().hex}.mp4")
 
-    progress_bar = st.progress(0, text="Initializing AI...")
+        progress_bar = st.progress(0, text="Initializing AI...")
 
-    def update_progress(pct):
-        progress_bar.progress(pct, text=f"Processing... {pct}%")
+        def update_progress(pct):
+            progress_bar.progress(pct, text=f"Processing... {pct}%")
 
-    t0 = time.time()
-    
-    # -------------------------------
-    # Safety check for unpacking
-    # -------------------------------
-    result = process_video(
-        temp_in.name,
-        out_path,
-        max_disp=max_disp,
-        target_height=target_h,
-        every_n=every_n,
-        progress_callback=update_progress
-    )
+        t0 = time.time()
 
-    if isinstance(result, tuple) and len(result) == 5:
-        final_out, anaglyph_frame, total_frames, written_frames, out_fps = result
-    else:
-        st.error("❌ process_video did not return expected 5 values")
-        st.stop()
+        result = process_video(
+            temp_in.name,
+            out_path,
+            max_disp=max_disp,
+            target_height=target_h,
+            every_n=every_n,
+            progress_callback=update_progress
+        )
 
-    dt = time.time() - t0
+        if isinstance(result, tuple) and len(result) == 5:
+            final_out, anaglyph_frame, total_frames, written_frames, out_fps = result
+        else:
+            st.error("❌ process_video did not return expected 5 values")
+            st.stop()
 
-    st.success(f"✅ Done in {dt:.1f} seconds")
-    st.info(f"🎥 Input frames: {total_frames} | Written frames: {written_frames} | Output FPS: {out_fps:.2f}")
+        dt = time.time() - t0
 
-    with open(final_out, "rb") as f:
-        video_bytes = f.read()
-        b64_video = base64.b64encode(video_bytes).decode()
+        st.success(f"✅ Done in {dt:.1f} seconds")
+        st.info(f"🎥 Input frames: {total_frames} | Written frames: {written_frames} | Output FPS: {out_fps:.2f}")
 
+        with open(final_out, "rb") as f:
+            video_bytes = f.read()
+
+        # -------------------------------
+        # SBS preview
+        # -------------------------------
         if "SBS" in preview_modes:
             st.subheader("📺 SBS VR Video")
             st.video(video_bytes)
             st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
 
+        # -------------------------------
+        # WebVR preview
+        # -------------------------------
         if "WebVR" in preview_modes:
             st.subheader("🕶️ Interactive WebVR Preview")
-           # Save final video to temp file and get its path
-video_url = final_out.replace("\\", "/")  # make sure path separators are correct
+            video_url = final_out.replace("\\", "/")  # safe now
+            aframe_html = f"""
+            <html>
+            <head>
+              <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+            </head>
+            <body style="margin:0; background:black;">
+              <a-scene>
+                <a-videosphere src="file://{video_url}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
+                <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
+              </a-scene>
+            </body>
+            </html>
+            """
+            components.html(aframe_html, height=500)
 
-aframe_html = f"""
-<html>
-<head>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-</head>
-<body style="margin:0; background:black;">
-  <a-scene>
-    <a-videosphere src="file://{video_url}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
-    <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
-  </a-scene>
-</body>
-</html>
-"""
-components.html(aframe_html, height=500)
-if "Anaglyph" in preview_modes and anaglyph_frame is not None:
+        # -------------------------------
+        # Anaglyph preview
+        # -------------------------------
+        if "Anaglyph" in preview_modes and anaglyph_frame is not None:
             st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
             st.image(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
