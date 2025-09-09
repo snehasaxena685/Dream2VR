@@ -3,6 +3,7 @@ import tempfile, os, time, uuid
 import cv2
 import numpy as np
 import torch
+import base64   # <-- add this
 
 # -------------------------------
 # Clear cache
