@@ -190,13 +190,7 @@ if process_btn and uploaded:
             video_bytes = f.read()
 
         # -------------------------------
-        # SBS preview
-        # -------------------------------
-        if "SBS" in preview_modes:
-            st.subheader("📺 SBS VR Video")
-            st.video(video_bytes)
-            st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
-
+       
         # -------------------------------
         # Anaglyph preview
         # -------------------------------
