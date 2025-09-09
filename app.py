@@ -57,7 +57,7 @@ h1, h2, h3, h4, h5, h6 {
 # -------------------------------
 API_KEY = st.secrets.get("API_KEY", os.getenv("API_KEY", None))
 if API_KEY:
-    st.sidebar.success("Welcome to Dream2VR")
+    st.sidebar.success("🔑 API key loaded")
 else:
     st.sidebar.warning("⚠️ No API key found. Local processing only.")
 
@@ -231,6 +231,35 @@ if process_btn and uploaded:
 
         with open(final_out, "rb") as f:
             video_bytes = f.read()
+
+        # -------------------------------
+        # SBS preview
+        # -------------------------------
+        if "SBS" in preview_modes:
+            st.subheader("📺 SBS VR Video")
+            st.video(video_bytes)
+            st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
+
+        # -------------------------------
+        # WebVR preview
+        # -------------------------------
+        if "WebVR" in preview_modes:
+            st.subheader("🕶️ Interactive WebVR Preview")
+            video_url = final_out.replace("\\", "/")  # safe now
+            aframe_html = f"""
+            <html>
+            <head>
+              <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+            </head>
+            <body style="margin:0; background:black;">
+              <a-scene>
+                <a-videosphere src="file://{video_url}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
+                <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
+              </a-scene>
+            </body>
+            </html>
+            """
+            components.html(aframe_html, height=500)
 
         # -------------------------------
         # Anaglyph preview
