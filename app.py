@@ -137,18 +137,64 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     return output_path, anaglyph_preview, total_frames, written_frames, out_fps
 
 # -------------------------------
+# -------------------------------
 # Streamlit UI
 # -------------------------------
-st.set_page_config(page_title="Dream2VR — 2D ➜ VR", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Dream2VR — 2D ➜ VR", page_icon="🎬", layout="wide")
+
+# Background video styling
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: transparent;
+    }
+    #background-video {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        min-width: 100%;
+        min-height: 100%;
+        z-index: -1;
+        filter: blur(6px) brightness(0.35);
+        object-fit: cover;
+    }
+    .hud-container {
+        background: rgba(13, 17, 23, 0.7);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0px 0px 25px rgba(0, 255, 247, 0.4);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("🎬 Dream2VR — 2D ➜ VR")
 st.caption("Upload a 2D video and preview it in SBS or Anaglyph 3D mode.")
 
 uploaded = st.file_uploader("Upload a short MP4 (5–15s is best)", type=["mp4", "mov", "m4v"])
-if uploaded:
-    st.video(uploaded)
 
-st.subheader("⚙️ Settings")
+# Inject background video (only if uploaded)
+if uploaded:
+    video_bytes = uploaded.read()
+    video_b64 = f"data:video/mp4;base64,{base64.b64encode(video_bytes).decode()}"
+    st.markdown(
+        f"""
+        <video autoplay muted loop id="background-video">
+            <source src="{video_b64}" type="video/mp4">
+        </video>
+        """,
+        unsafe_allow_html=True,
+    )
+    # reset file pointer for later use
+    uploaded.seek(0)
+
+# HUD UI
 with st.container():
+    st.markdown('<div class="hud-container">', unsafe_allow_html=True)
+
+    st.subheader("⚙️ Settings")
     max_disp = st.slider("Max disparity (3D effect strength)", 4, 64, 24)
     target_h = st.selectbox("Target height", [360, 480, 720], index=1)
     every_n = st.selectbox("Process every Nth frame (speed boost)", [1, 2, 3], index=0)
@@ -158,7 +204,9 @@ with st.container():
         default=["SBS"]
     )
 
-process_btn = st.button("🚀 Process Video", type="primary", use_container_width=True)
+    process_btn = st.button("🚀 Process Video", type="primary", use_container_width=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if process_btn and uploaded:
     with st.spinner("🤖 AI processing video frames..."):
@@ -186,14 +234,13 @@ if process_btn and uploaded:
         st.success(f"✅ Done in {dt:.1f} seconds")
         st.info(f"🎥 Input frames: {total_frames} | Written frames: {written_frames} | Output FPS: {out_fps:.2f}")
 
-        with open(final_out, "rb") as f:
-            video_bytes = f.read()
+        # Display SBS video
+        if "SBS" in preview_modes:
+            st.subheader("🕶️ SBS Preview")
+            with open(final_out, "rb") as f:
+                st.video(f.read())
 
-        # -------------------------------
-       
-        # -------------------------------
-        # Anaglyph preview
-        # -------------------------------
+        # Display Anaglyph still preview
         if "Anaglyph" in preview_modes and anaglyph_frame is not None:
             st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
             st.image(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
