@@ -7,6 +7,12 @@ import torch
 import base64
 
 # -------------------------------
+# Clear cache to avoid old function issues
+# -------------------------------
+st.cache_data.clear()
+st.cache_resource.clear()
+
+# -------------------------------
 # Custom CSS for futuristic look
 # -------------------------------
 st.markdown("""
@@ -47,13 +53,13 @@ h1, h2, h3, h4, h5, h6 {
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Load API Key securely
+# Load API Key (future use)
 # -------------------------------
 API_KEY = st.secrets.get("API_KEY", os.getenv("API_KEY", None))
 if API_KEY:
     st.sidebar.success("🔑 API key loaded")
 else:
-    st.sidebar.warning("⚠️ No API key found. Local-only mode")
+    st.sidebar.warning("⚠️ No API key found. Local processing only.")
 
 # -------------------------------
 # Load MiDaS depth model (cached)
@@ -70,6 +76,9 @@ def load_midas():
 
 midas, midas_transform, device = load_midas()
 
+# -------------------------------
+# Video processing functions
+# -------------------------------
 def estimate_depth(frame_bgr):
     img = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     input_batch = midas_transform(img).to(device)
@@ -120,30 +129,14 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
     scale = target_height / height
     new_w = int(width * scale)
     new_h = target_height
     out_fps = max(1.0, fps / every_n)
-
-    # 🔧 Try safer codecs
-    codecs = [
-        ("mp4v", output_path),  # MP4
-        ("MJPG", output_path.replace(".mp4", ".avi")),  # AVI fallback
-    ]
-    writer = None
-    chosen_codec = None
-
-    for codec, path in codecs:
-        fourcc = cv2.VideoWriter_fourcc(*codec)
-        writer = cv2.VideoWriter(path, fourcc, out_fps, (new_w * 2, new_h))
-        if writer.isOpened():
-            chosen_codec = codec
-            output_path = path
-            break
-
-    if writer is None or not writer.isOpened():
-        raise RuntimeError("⚠️ VideoWriter failed to open. No supported codecs available.")
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    writer = cv2.VideoWriter(output_path, fourcc, out_fps, (new_w * 2, new_h))
+    if not writer.isOpened():
+        raise RuntimeError("⚠️ VideoWriter failed to open. Try another codec.")
 
     anaglyph_preview = None
     frame_idx = 0
@@ -156,20 +149,16 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
         if frame_idx % every_n != 0:
             frame_idx += 1
             continue
-
         frame = cv2.resize(frame, (new_w, new_h))
         depth = estimate_depth(frame)
         left, right, sbs = make_stereo(frame, depth, max_disp=max_disp)
         writer.write(sbs)
         written_frames += 1
-
         if anaglyph_preview is None:
             anaglyph_preview = make_anaglyph(left, right)
-
         if progress_callback:
             percent = int((frame_idx / total_frames) * 100)
             progress_callback(min(percent, 100))
-
         frame_idx += 1
 
     cap.release()
@@ -178,13 +167,12 @@ def process_video(input_path, output_path, max_disp=24, target_height=480, every
     if written_frames == 0:
         raise RuntimeError("⚠️ No frames were written to output video.")
 
-    return output_path, anaglyph_preview, total_frames, written_frames, out_fps, chosen_codec
+    return output_path, anaglyph_preview, total_frames, written_frames, out_fps
 
 # -------------------------------
 # Streamlit UI
 # -------------------------------
 st.set_page_config(page_title="Dream2VR — 2D ➜ VR", page_icon="🎬", layout="centered")
-
 st.title("🎬 Dream2VR — 2D ➜ VR")
 st.caption("Upload a 2D video and preview it in VR, SBS, or Anaglyph 3D mode.")
 
@@ -218,7 +206,11 @@ if process_btn and uploaded:
         progress_bar.progress(pct, text=f"Processing... {pct}%")
 
     t0 = time.time()
-    final_out, anaglyph_frame, total_frames, written_frames, out_fps = process_video(
+    
+    # -------------------------------
+    # Safety check for unpacking
+    # -------------------------------
+    result = process_video(
         temp_in.name,
         out_path,
         max_disp=max_disp,
@@ -226,6 +218,13 @@ if process_btn and uploaded:
         every_n=every_n,
         progress_callback=update_progress
     )
+
+    if isinstance(result, tuple) and len(result) == 5:
+        final_out, anaglyph_frame, total_frames, written_frames, out_fps = result
+    else:
+        st.error("❌ process_video did not return expected 5 values")
+        st.stop()
+
     dt = time.time() - t0
 
     st.success(f"✅ Done in {dt:.1f} seconds")
@@ -235,13 +234,11 @@ if process_btn and uploaded:
         video_bytes = f.read()
         b64_video = base64.b64encode(video_bytes).decode()
 
-        # SBS Preview + Download
         if "SBS" in preview_modes:
             st.subheader("📺 SBS VR Video")
             st.video(video_bytes)
             st.download_button("⬇️ Download SBS VR Video", video_bytes, file_name="dream2vr_sbs.mp4")
 
-        # WebVR Preview (A-Frame)
         if "WebVR" in preview_modes:
             st.subheader("🕶️ Interactive WebVR Preview")
             aframe_html = f"""
@@ -259,7 +256,6 @@ if process_btn and uploaded:
             """
             components.html(aframe_html, height=500)
 
-        # Anaglyph Preview
         if "Anaglyph" in preview_modes and anaglyph_frame is not None:
             st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
             st.image(anaglyph_frame, channels="BGR", caption="Preview with red/cyan glasses")
