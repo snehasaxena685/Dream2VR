@@ -246,20 +246,23 @@ if process_btn and uploaded:
 
         if "WebVR" in preview_modes:
             st.subheader("🕶️ Interactive WebVR Preview")
-            aframe_html = f"""
-            <html>
-            <head>
-              <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-            </head>
-            <body style="margin:0; background:black;">
-              <a-scene>
-                <a-videosphere src="data:video/mp4;base64,{b64_video}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
-                <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
-              </a-scene>
-            </body>
-            </html>
-            """
-            components.html(aframe_html, height=500)
+           # Save final video to temp file and get its path
+video_url = final_out.replace("\\", "/")  # make sure path separators are correct
+
+aframe_html = f"""
+<html>
+<head>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+</head>
+<body style="margin:0; background:black;">
+  <a-scene>
+    <a-videosphere src="file://{video_url}" autoplay="true" loop="true" rotation="0 -90 0"></a-videosphere>
+    <a-camera wasd-controls-enabled="true" look-controls="true"></a-camera>
+  </a-scene>
+</body>
+</html>
+"""
+components.html(aframe_html, height=500)
 
         if "Anaglyph" in preview_modes and anaglyph_frame is not None:
             st.subheader("👓 Anaglyph 3D Preview (Red/Cyan Glasses)")
